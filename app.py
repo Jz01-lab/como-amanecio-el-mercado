@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import io
-# Ya no necesitamos BeautifulSoup porque vamos directo al Excel
+import datetime 
+# Importamos 'datetime' para calcular la fecha de hoy automáticamente.
 
 # Configuración de la página
 st.set_page_config(page_title="Cómo amaneció el mercado", layout="wide")
@@ -15,25 +16,31 @@ st.write("Precios actualizados directamente desde el Ministerio de Agricultura."
 @st.cache_data(ttl=3600) 
 def obtener_datos():
     
-    # 🚨🚨🚨 PUNTO CRÍTICO QUE DEBES CAMBIAR DIARIAMENTE 🚨🚨🚨
-    # El archivo Excel tiene la fecha en el nombre. Esta URL debe ser actualizada
-    # cada vez que el Ministerio publique un nuevo informe (ej: 04-12-2025).
-    # Si esta URL no existe, el robot fallará.
-    url_base = "https://agricultura.gob.do/wp-content/uploads/2025/12/Informe-de-Precios-03-12-2025.xlsx"
+    # ** CÓDIGO CLAVE PARA AUTOMATIZAR LA FECHA **
+    hoy = datetime.date.today()
+    # Formato de fecha del archivo: DD-MM-YYYY (ej: 04-12-2025)
+    fecha_str = hoy.strftime("%d-%m-%Y")
+    # Formato de año y mes para la ruta de la URL (ej: /2025/12/)
+    anio_str = hoy.strftime("%Y")
+    mes_str = hoy.strftime("%m")
+    
+    # Construimos la URL usando la fecha actual. 
+    # Ejemplo de URL: https://agricultura.gob.do/wp-content/uploads/2025/12/Informe-de-Precios-04-12-2025.xlsx
+    url_base = f"https://agricultura.gob.do/wp-content/uploads/{anio_str}/{mes_str}/Informe-de-Precios-{fecha_str}.xlsx"
     
     try:
         # 1. Descargar el Excel directamente desde la URL
         excel_data = requests.get(url_base).content
         
         # 2. Leer el Excel, ignorando las primeras 5 filas (para saltar logos y títulos)
-        # La tabla empieza en la Fila 6, por eso usamos header=5
+        # La tabla de precios empieza en la Fila 6, por eso usamos header=5
         df = pd.read_excel(io.BytesIO(excel_data), header=5)
         
         return df, url_base
         
     except Exception as e:
-        # Si falla, es por la URL incorrecta o el archivo no existe.
-        st.error(f"❌ ¡ERROR! No se pudo leer el reporte de hoy. Por favor, asegúrate de que la fecha en el enlace sea la más reciente.")
+        # Si falla, es porque el archivo del día no ha sido publicado o no existe.
+        st.error(f"❌ ¡ERROR! No se pudo leer el reporte de hoy ({fecha_str}). El archivo aún no está disponible o la URL ha cambiado. Por favor, intenta más tarde.")
         return None, None
 # --- FIN DE LA FUNCIÓN DE DESCARGA Y LECTURA ---
 
