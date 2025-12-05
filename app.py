@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import io
 import datetime 
-# Importamos 'datetime' para calcular la fecha de hoy automáticamente.
+# Importamos 'datetime' para calcular la fecha de hoy y de ayer automáticamente.
 
 # Configuración de la página
 st.set_page_config(page_title="Cómo amaneció el mercado", layout="wide")
@@ -16,32 +16,36 @@ st.write("Precios actualizados directamente desde el Ministerio de Agricultura."
 @st.cache_data(ttl=3600) 
 def obtener_datos():
     
-    # ** CÓDIGO CLAVE PARA AUTOMATIZAR LA FECHA **
     hoy = datetime.date.today()
-    # Formato de fecha del archivo: DD-MM-YYYY (ej: 04-12-2025)
-    fecha_str = hoy.strftime("%d-%m-%Y")
-    # Formato de año y mes para la ruta de la URL (ej: /2025/12/)
-    anio_str = hoy.strftime("%Y")
-    mes_str = hoy.strftime("%m")
+    ayer = hoy - datetime.timedelta(days=1)
     
-    # Construimos la URL usando la fecha actual. 
-    # Ejemplo de URL: https://agricultura.gob.do/wp-content/uploads/2025/12/Informe-de-Precios-04-12-2025.xlsx
-    url_base = f"https://agricultura.gob.do/wp-content/uploads/{anio_str}/{mes_str}/Informe-de-Precios-{fecha_str}.xlsx"
+    # 1. Intentar Hoy: Generamos la URL del informe con la fecha actual
+    fecha_hoy = hoy.strftime("%d-%m-%Y")
+    url_hoy = f"https://agricultura.gob.do/wp-content/uploads/{hoy.strftime('%Y')}/{hoy.strftime('%m')}/Informe-de-Precios-{fecha_hoy}.xlsx"
     
     try:
-        # 1. Descargar el Excel directamente desde la URL
-        excel_data = requests.get(url_base).content
-        
-        # 2. Leer el Excel, ignorando las primeras 5 filas (para saltar logos y títulos)
-        # La tabla de precios empieza en la Fila 6, por eso usamos header=5
+        st.info(f"⏳ Buscando reporte del día: {fecha_hoy}...")
+        excel_data = requests.get(url_hoy).content
         df = pd.read_excel(io.BytesIO(excel_data), header=5)
+        st.success(f"✅ Reporte del {fecha_hoy} cargado correctamente.")
+        return df, url_hoy
+    
+    except:
+        # 2. Si Hoy falla (el archivo no existe), intentamos AYER (Fallback)
+        st.warning(f"⚠️ El reporte del {fecha_hoy} no ha sido publicado. Intentando cargar reporte de AYER...")
+        fecha_ayer = ayer.strftime("%d-%m-%Y")
+        url_ayer = f"https://agricultura.gob.do/wp-content/uploads/{ayer.strftime('%Y')}/{ayer.strftime('%m')}/Informe-de-Precios-{fecha_ayer}.xlsx"
         
-        return df, url_base
+        try:
+            excel_data = requests.get(url_ayer).content
+            df = pd.read_excel(io.BytesIO(excel_data), header=5)
+            st.success(f"✅ Reporte del {fecha_ayer} (ayer) cargado correctamente. Se actualizará cuando el de hoy esté listo.")
+            return df, url_ayer
         
-    except Exception as e:
-        # Si falla, es porque el archivo del día no ha sido publicado o no existe.
-        st.error(f"❌ ¡ERROR! No se pudo leer el reporte de hoy ({fecha_str}). El archivo aún no está disponible o la URL ha cambiado. Por favor, intenta más tarde.")
-        return None, None
+        except Exception as e:
+            # Si ambos fallan, mostramos el error
+            st.error(f"❌ ¡ERROR CRÍTICO! No se pudo leer ni el reporte de hoy ni el de ayer. Por favor, verifique el sitio oficial.")
+            return None, None
 # --- FIN DE LA FUNCIÓN DE DESCARGA Y LECTURA ---
 
 # --- EJECUCIÓN Y VISUALIZACIÓN ---
