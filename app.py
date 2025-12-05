@@ -20,9 +20,11 @@ def obtener_datos():
         response = requests.get(url_base)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 2. Buscar cualquier enlace que contenga la palabra "Informe"
-        link = soup.find('a', href=True, string=lambda t: t and 'Informe' in t)
-        # Si no encuentra 'Informe', busca el primer botón de descarga que tenga la URL de un .xlsx o .xls
+        # 2. Búsqueda final: Intentar encontrar el botón de descarga por su etiqueta 'save_alt'
+        # Esto asume que el icono de descarga se identifica en el HTML
+        link = soup.find('a', attrs={'title': 'Descargar'})
+        
+        # Si no lo encuentra por título, buscar el primer enlace que lleve a un archivo Excel
         if not link:
             link = soup.find('a', href=lambda href: href and ('.xlsx' in href or '.xls' in href))
         
