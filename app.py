@@ -33,8 +33,8 @@ def obtener_datos():
             # 3. Descargar el Excel en memoria
             excel_data = requests.get(url_excel).content
             
-            # 4. Leer el Excel (ajustamos header=3 porque suelen tener logos arriba)
-            df = pd.read_excel(io.BytesIO(excel_data), header=3)
+            # 4. Leer el Excel (ajustamos header=5 para ignorar logos, títulos y notas iniciales)
+            df = pd.read_excel(io.BytesIO(excel_data), header=5)
             return df, url_excel
         else:
             return None, None
