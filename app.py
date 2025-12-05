@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import io
 import datetime 
-# Importamos 'datetime' para calcular la fecha de hoy y de ayer automáticamente.
 
 # Configuración de la página
 st.set_page_config(page_title="Cómo amaneció el mercado", layout="wide")
@@ -16,35 +15,42 @@ st.write("Precios actualizados directamente desde el Ministerio de Agricultura."
 @st.cache_data(ttl=3600) 
 def obtener_datos():
     
+    # 1. Definimos el disfraz de navegador (User-Agent) para evitar el bloqueo del servidor
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
     hoy = datetime.date.today()
     ayer = hoy - datetime.timedelta(days=1)
     
-    # 1. Intentar Hoy: Generamos la URL del informe con la fecha actual
+    # 2. Intentar Hoy: Generamos la URL del informe con la fecha actual
     fecha_hoy = hoy.strftime("%d-%m-%Y")
     url_hoy = f"https://agricultura.gob.do/wp-content/uploads/{hoy.strftime('%Y')}/{hoy.strftime('%m')}/Informe-de-Precios-{fecha_hoy}.xlsx"
     
     try:
         st.info(f"⏳ Buscando reporte del día: {fecha_hoy}...")
-        excel_data = requests.get(url_hoy).content
+        # Usamos el disfraz (headers=headers)
+        excel_data = requests.get(url_hoy, headers=headers).content
         df = pd.read_excel(io.BytesIO(excel_data), header=5)
         st.success(f"✅ Reporte del {fecha_hoy} cargado correctamente.")
         return df, url_hoy
     
     except:
-        # 2. Si Hoy falla (el archivo no existe), intentamos AYER (Fallback)
+        # 3. Si Hoy falla, intentamos AYER (Fallback)
         st.warning(f"⚠️ El reporte del {fecha_hoy} no ha sido publicado. Intentando cargar reporte de AYER...")
         fecha_ayer = ayer.strftime("%d-%m-%Y")
         url_ayer = f"https://agricultura.gob.do/wp-content/uploads/{ayer.strftime('%Y')}/{ayer.strftime('%m')}/Informe-de-Precios-{fecha_ayer}.xlsx"
         
         try:
-            excel_data = requests.get(url_ayer).content
+            # Usamos el disfraz (headers=headers)
+            excel_data = requests.get(url_ayer, headers=headers).content
             df = pd.read_excel(io.BytesIO(excel_data), header=5)
-            st.success(f"✅ Reporte del {fecha_ayer} (ayer) cargado correctamente. Se actualizará cuando el de hoy esté listo.")
+            st.success(f"✅ Reporte del {fecha_ayer} (ayer) cargado correctamente.")
             return df, url_ayer
         
         except Exception as e:
             # Si ambos fallan, mostramos el error
-            st.error(f"❌ ¡ERROR CRÍTICO! No se pudo leer ni el reporte de hoy ni el de ayer. Por favor, verifique el sitio oficial.")
+            st.error(f"❌ ¡ERROR CRÍTICO! No se pudo leer ni el reporte de hoy ni el de ayer. El servidor del gobierno puede estar bloqueando la solicitud o los archivos no están disponibles.")
             return None, None
 # --- FIN DE LA FUNCIÓN DE DESCARGA Y LECTURA ---
 
