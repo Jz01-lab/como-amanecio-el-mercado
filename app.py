@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 import io
+# Ya no necesitamos BeautifulSoup porque vamos directo al Excel
 
 # Configuración de la página
 st.set_page_config(page_title="Cómo amaneció el mercado", layout="wide")
@@ -10,56 +10,58 @@ st.set_page_config(page_title="Cómo amaneció el mercado", layout="wide")
 st.title("🇩🇴 ¿Cómo amaneció el mercado?")
 st.write("Precios actualizados directamente desde el Ministerio de Agricultura.")
 
-# Función para obtener los datos (El Robot)
-@st.cache_data(ttl=3600) # Se actualiza cada hora para no saturar
+# --- INICIO DE LA FUNCIÓN DE DESCARGA Y LECTURA ---
+# Se actualiza cada hora para no saturar el servidor del gobierno
+@st.cache_data(ttl=3600) 
 def obtener_datos():
-    url_base = "https://agricultura.gob.do/category/estadisticas-agropecuarias/precios-de-productos-agropecuarios/2-datos-inter-diarios-de-precios-de-mercados-y-supermercados-de-sto-dgo/precios-inter-diarios-del-mes-de-junio/"
+    
+    # 🚨🚨🚨 PUNTO CRÍTICO QUE DEBES CAMBIAR DIARIAMENTE 🚨🚨🚨
+    # El archivo Excel tiene la fecha en el nombre. Esta URL debe ser actualizada
+    # cada vez que el Ministerio publique un nuevo informe (ej: 04-12-2025).
+    # Si esta URL no existe, el robot fallará.
+    url_base = "https://agricultura.gob.do/wp-content/uploads/2025/12/Informe-de-Precios-03-12-2025.xlsx"
     
     try:
-       try:
-        # **ESTE ES EL CAMBIO CLAVE:** Usaremos un archivo de ejemplo con el mismo formato.
-        # Si la URL del gobierno funciona (lo cual aún no podemos saber), el código de arriba
-        # funcionaría. Ahora, nos enfocaremos en leer el ARCHIVO.
+        # 1. Descargar el Excel directamente desde la URL
+        excel_data = requests.get(url_base).content
         
-        # Simulamos que el archivo fue descargado
-        # Nota: Aquí deberíamos haber puesto el código para leer el CSV que subiste
-        # Pero, como Streamlit no tiene un enlace a tu archivo, lo simularemos como un error controlado.
+        # 2. Leer el Excel, ignorando las primeras 5 filas (para saltar logos y títulos)
+        # La tabla empieza en la Fila 6, por eso usamos header=5
+        df = pd.read_excel(io.BytesIO(excel_data), header=5)
         
-        st.error("🤖 ¡El robot no tiene un enlace directo! Debes obtener el enlace público del Excel del gobierno.")
-        st.info("Mientras tanto, ajustaremos la lectura del Excel. Por favor, asegúrate de que el código de búsqueda esté en tu archivo.")
+        return df, url_base
         
-        return None, None
-    
     except Exception as e:
-        st.error(f"Error procesando los datos: {e}")
+        # Si falla, es por la URL incorrecta o el archivo no existe.
+        st.error(f"❌ ¡ERROR! No se pudo leer el reporte de hoy. Por favor, asegúrate de que la fecha en el enlace sea la más reciente.")
         return None, None
-    except Exception as e:
-        st.error(f"Error conectando con Agricultura: {e}")
-        return None, None
+# --- FIN DE LA FUNCIÓN DE DESCARGA Y LECTURA ---
 
-# Ejecutar el robot
+# --- EJECUCIÓN Y VISUALIZACIÓN ---
 df, url_fuente = obtener_datos()
 
 if df is not None:
-    # Limpieza básica (Eliminar filas vacías si las hay)
+    # Limpieza básica
     df = df.dropna(how='all')
     
-    # Buscador de productos
+    # Buscador y Tabla
+    st.subheader("Búsqueda y Tabla de Precios")
     producto = st.text_input("🔍 Busca un producto (ej: Yuca, Arroz, Pollo)", "")
     
     if producto:
-        # Filtrar si el usuario escribió algo
+        # Filtrar por el término
         df_filtrado = df[df.apply(lambda row: row.astype(str).str.contains(producto, case=False).any(), axis=1)]
         st.dataframe(df_filtrado, use_container_width=True)
     else:
         # Mostrar todo
         st.dataframe(df, use_container_width=True)
         
-    st.caption(f"Fuente oficial: [Descargar Excel Original]({url_fuente})")
+    st.caption(f"Fuente oficial del reporte: [Descargar Excel Original]({url_fuente})")
 else:
-    st.warning("No pudimos leer el reporte de hoy. Intenta más tarde.")
+    # El error se muestra en la función, no necesitamos hacer nada aquí.
+    pass 
 
-# Nota para ti: Esto quita la marca de agua de Streamlit para que se vea más pro
+# Quita la marca de agua de Streamlit para una apariencia más limpia
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
